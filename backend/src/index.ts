@@ -10,6 +10,7 @@ import { basePrompt as reactBasePrompt } from './defaults/react'
 const app = express()
 app.use(express.json())
 app.use(cors())
+const port = process.env.PORT || 3000 
 
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
@@ -89,7 +90,9 @@ app.post('/chat', async (req, res) => {
 
 
 
-app.listen(3000)
+app.listen(port, () => {
+  console.log(`server is running on Port ${port}`);
+});
 
 
 // async function main() {
