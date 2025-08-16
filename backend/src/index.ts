@@ -78,7 +78,7 @@ app.post('/chat', async (req, res) => {
 
   // // console.log(messages)
 
-  console.log(response.choices[0].message.content)
+  // console.log(response.choices[0].message.content)
   
   res.json({
     response: response.choices[0].message.content
