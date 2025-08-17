@@ -81,9 +81,7 @@ app.post('/chat', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     });
     return;
 }));
-app.listen(port, () => {
-    console.log(`server is running on Port ${port}`);
-});
+app.listen(port);
 // async function main() {
 //   const stream = await openai.chat.completions.create({
 //     model: "openai/gpt-oss-20b:free",

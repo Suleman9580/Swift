@@ -7,9 +7,7 @@ import { BACKEND_URL } from '../config';
 import axios from 'axios'
 import {parseXml}  from '../steps';
 import { useWebContainer } from '../hooks/useWebContainer';
-import { PreviewFrame } from './PreviewFrame';
-
-
+import {PreviewFrame}  from './PreviewFrame';
 
 
 export interface FileItem {
@@ -21,6 +19,8 @@ export interface FileItem {
 }
 
 const GenerationPage: React.FC = () => {
+
+
   const location = useLocation();
   const navigate = useNavigate();
   const prompt = location.state?.prompt || 'Create a website';
@@ -98,40 +98,8 @@ const GenerationPage: React.FC = () => {
   const [files, setFiles] = useState<FileItem[]>([ ])
 
 
-  async function init() {
-    const response = await axios.post(`${BACKEND_URL}/template`, {
-      prompt: prompt.trim()
-    })   
-    const {prompts, uiPrompts} = response.data;
-
-    setSteps(parseXml(uiPrompts[0]).map((x: Step) => ({
-      ...x,
-      status: "pending"
-    })))
-
-    const stepResponse = await axios.post(`${BACKEND_URL}/chat`, {
-      messages: [...prompts, prompt].map(content => ({
-        role: "user",
-        content
-      }))
-    })
-    if(stepResponse.data.status == "success") {
-      setChatResponseStatus(true)
-    }
-
-    setSteps(s => [...s, ...parseXml(stepResponse.data.response).map(x => ({
-      ...x,
-      status: "pending" as "pending"
-    }))]);
-   
-    setIsGenerating(false)
-  }
-
-  useEffect(() => {
-    init();
-  }, [])
   
-
+  
   useEffect(()=> {
     let originalFiles = [...files];
     let updateHappened = false;
@@ -242,11 +210,43 @@ const GenerationPage: React.FC = () => {
     // Mount the structure if WebContainer is available
     console.log(mountStructure);
     webcontainer?.mount(mountStructure);
-
   }, [files, webcontainer]);
 
 
-  
+  async function init() {
+    const response = await axios.post(`${BACKEND_URL}/template`, {
+      prompt: prompt.trim()
+    })   
+    const {prompts, uiPrompts} = response.data;
+
+    setSteps(parseXml(uiPrompts[0]).map((x: Step) => ({
+      ...x,
+      status: "pending"
+    })))
+
+    const stepResponse = await axios.post(`${BACKEND_URL}/chat`, {
+      messages: [...prompts, prompt].map(content => ({
+        role: "user",
+        content
+      }))
+    })
+
+    
+
+    if(stepResponse.data.status == 200) {
+      setChatResponseStatus(true)
+    }
+
+    setSteps(s => [...s, ...parseXml(stepResponse.data.response).map(x => ({
+      ...x,
+      status: "pending" as "pending"
+    }))]);
+   
+    setIsGenerating(false)
+  }
+  useEffect(() => {
+    init();
+  }, [])
 
   
 
@@ -372,7 +372,8 @@ const GenerationPage: React.FC = () => {
             <div className="col-span-2 bg-gray-900 rounded-lg shadow-lg p-4 w-full h-full">
             
             {!webcontainer && <div className="text-center text-gray-400">Web Container is not available</div>}
-            { webcontainer && <PreviewFrame chatResponseStatus={chatResponseStatus} webContainer={webcontainer} files={files} /> }
+
+            {webcontainer && <PreviewFrame  webContainer={webcontainer} files={files} />}
 
             </div>
 
