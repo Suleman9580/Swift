@@ -5,8 +5,12 @@ export function useWebContainer() {
     const [webcontainer, setWebcontainer] = useState<WebContainer>();
 
     async function main() {
-        const webcontainerInstance = await WebContainer.boot();
-        setWebcontainer(webcontainerInstance)
+        if(!webcontainer){
+            const webcontainerInstance = await WebContainer.boot();
+            setWebcontainer(webcontainerInstance)
+        }else{
+            console.log("webcontainer already available")
+        }
     }
     useEffect(() => {
         main();

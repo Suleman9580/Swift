@@ -29,6 +29,7 @@ const GenerationPage: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(true);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
+  const [chatResponseStatus, setChatResponseStatus] = useState(false);
   const webcontainer = useWebContainer();
  
 
@@ -96,6 +97,39 @@ const GenerationPage: React.FC = () => {
 
   const [files, setFiles] = useState<FileItem[]>([ ])
 
+
+  async function init() {
+    const response = await axios.post(`${BACKEND_URL}/template`, {
+      prompt: prompt.trim()
+    })   
+    const {prompts, uiPrompts} = response.data;
+
+    setSteps(parseXml(uiPrompts[0]).map((x: Step) => ({
+      ...x,
+      status: "pending"
+    })))
+
+    const stepResponse = await axios.post(`${BACKEND_URL}/chat`, {
+      messages: [...prompts, prompt].map(content => ({
+        role: "user",
+        content
+      }))
+    })
+    if(stepResponse.data.status == "success") {
+      setChatResponseStatus(true)
+    }
+
+    setSteps(s => [...s, ...parseXml(stepResponse.data.response).map(x => ({
+      ...x,
+      status: "pending" as "pending"
+    }))]);
+   
+    setIsGenerating(false)
+  }
+
+  useEffect(() => {
+    init();
+  }, [])
   
 
   useEffect(()=> {
@@ -212,35 +246,7 @@ const GenerationPage: React.FC = () => {
   }, [files, webcontainer]);
 
 
-  async function init() {
-    const response = await axios.post(`${BACKEND_URL}/template`, {
-      prompt: prompt.trim()
-    })   
-    const {prompts, uiPrompts} = response.data;
-
-    setSteps(parseXml(uiPrompts[0]).map((x: Step) => ({
-      ...x,
-      status: "pending"
-    })))
-
-    const stepResponse = await axios.post(`${BACKEND_URL}/chat`, {
-      messages: [...prompts, prompt].map(content => ({
-        role: "user",
-        content
-      }))
-    })
-
-    setSteps(s => [...s, ...parseXml(stepResponse.data.response).map(x => ({
-      ...x,
-      status: "pending" as "pending"
-    }))]);
-   
-    setIsGenerating(false)
-  }
-
-  useEffect(() => {
-    init();
-  }, [])
+  
 
   
 
@@ -366,7 +372,7 @@ const GenerationPage: React.FC = () => {
             <div className="col-span-2 bg-gray-900 rounded-lg shadow-lg p-4 w-full h-full">
             
             {!webcontainer && <div className="text-center text-gray-400">Web Container is not available</div>}
-            { webcontainer && <PreviewFrame webContainer={webcontainer} files={files} /> }
+            { webcontainer && <PreviewFrame chatResponseStatus={chatResponseStatus} webContainer={webcontainer} files={files} /> }
 
             </div>
 

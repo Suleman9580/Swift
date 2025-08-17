@@ -4,15 +4,16 @@ import React, { useEffect, useState } from 'react';
 interface PreviewFrameProps {
   files: any[];
   webContainer: WebContainer ;
+  chatResponseStatus: boolean;
 }
 
-export function PreviewFrame({ files, webContainer }: PreviewFrameProps) {
+export function PreviewFrame({ files, webContainer, chatResponseStatus }: PreviewFrameProps) {
   // In a real implementation, this would compile and render the preview
   const [url, setUrl] = useState("");
 
   async function main() {
-
-    if (!webContainer) {
+    if(chatResponseStatus){
+      if (!webContainer) {
       console.error("WebContainer is not initialized");
       return;
     }
@@ -24,25 +25,25 @@ export function PreviewFrame({ files, webContainer }: PreviewFrameProps) {
       console.error('Unable to run npm install');
     }
 
-    // await installProcess.output.pipeTo(new WritableStream({
-    //   write(data) {
-    //     console.log(data);
-    //   }
-    // }));
+    await installProcess.output.pipeTo(new WritableStream({
+      write(data) {
+        console.log(data);
+      }
+    }));
 
     await webContainer.spawn('npm', ['run', 'dev']);
     console.log("npm run dev executed successfully")
     // Wait for `server-ready` event
-    await webContainer.on('server-ready', (port, url) => {
+    webContainer.on('server-ready', (port, url) => {
       // ...
       console.log(url + " - This is url string")
       // console.log(port)
       setUrl(url);
     });
+    }
   }
 
   // console.log(url+ "_this is url string") 
-
   useEffect(() => {
     main()
   }, [])

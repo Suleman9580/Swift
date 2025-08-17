@@ -22,9 +22,10 @@ const react_1 = require("./defaults/react");
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
 app.use((0, cors_1.default)());
+const port = process.env.PORT || 3000;
 const openai = new openai_1.default({
     baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.KIMI_API_KEY,
+    apiKey: process.env.OPEN_ROUTER_KEY,
 });
 app.post('/template', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const prompt = req.body.prompt;
@@ -43,23 +44,21 @@ app.post('/template', (req, res) => __awaiter(void 0, void 0, void 0, function* 
         ]
     });
     const answer = response.choices[0].message.content;
-    if (answer === 'react') {
+    if (answer == "react") {
         res.json({
-            prompts: [prompts_1.BASE_PROMPT, `Here is an artifact that contains all the files of the project visible to you.\nConsider the contents of all files in the project.\n\n${react_1.basePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
+            prompts: [prompts_1.BASE_PROMPT, `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${react_1.basePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
             uiPrompts: [react_1.basePrompt]
         });
         return;
     }
     if (answer === "node") {
         res.json({
-            prompts: [`Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${node_1.basePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
-            uiPrompts: [node_1.basePrompt],
-            message: "This is node"
+            prompts: [`Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${react_1.basePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
+            uiPrompts: [node_1.basePrompt]
         });
         return;
     }
-    res.status(403).json({ message: "not accessible this time" });
-    // console.log(answer)
+    res.status(403).json({ message: "You cant access this" });
     return;
 }));
 app.post('/chat', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -67,7 +66,6 @@ app.post('/chat', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     // console.log(messages)
     const response = yield openai.chat.completions.create({
         model: "openai/gpt-oss-20b:free",
-        max_tokens: 200,
         messages: [
             ...messages,
             {
@@ -77,13 +75,15 @@ app.post('/chat', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         ]
     });
     // // console.log(messages)
-    console.log(response.choices[0].message.content);
+    // console.log(response.choices[0].message.content)
     res.json({
         response: response.choices[0].message.content
     });
     return;
 }));
-app.listen(3000);
+app.listen(port, () => {
+    console.log(`server is running on Port ${port}`);
+});
 // async function main() {
 //   const stream = await openai.chat.completions.create({
 //     model: "openai/gpt-oss-20b:free",
