@@ -7,42 +7,52 @@ interface PreviewFrameProps {
 }
 
 export function PreviewFrame({ files, webContainer }: PreviewFrameProps) {
-  // In a real implementation, this would compile and render the preview
   const [url, setUrl] = useState("");
 
-  async function main() {
+  useEffect(() => {
+    if (!webContainer) return;
 
-     // Wait for `server-ready` event
-    webContainer.on('server-ready', (port, url) => {
-      // ...
-      console.log(url)
-      // console.log(port)
+    // listen for server-ready events
+    const unsubscribe = webContainer.on('server-ready', (port: number, url: string) => {
+      console.log('server-ready', port, url);
       setUrl(url);
     });
 
-    console.log(url)
+    (async () => {
+      try {
+        // install dependencies
+        const installProcess = await webContainer.spawn('npm', ['install']);
+        if (installProcess.output) {
+          // consume output to avoid blocking
+          installProcess.output.pipeTo(new WritableStream({ write() {} } as any));
+        }
 
-    const installProcess = await webContainer.spawn('npm', ['install']);
+        // wait for install to finish
+        try {
+          await installProcess.exit;
+        } catch (e) {
+          console.warn('install exited with error', e);
+        }
 
-    installProcess.output.pipeTo(new WritableStream({
-      write(data) {
-        // console.log(data);
+        // start dev server
+        const dev = await webContainer.spawn('npm', ['run', 'dev']);
+        if (dev.output) dev.output.pipeTo(new WritableStream({ write() {} } as any));
+      } catch (err) {
+        console.error('error starting preview', err);
       }
-    }));
+    })();
 
-    await webContainer.spawn('npm', ['run', 'dev']);
-
-   
-  }
-
-  useEffect(() => {
-    main()
-  }, [])
+    return () => {
+      try {
+        unsubscribe();
+      } catch (e) {}
+    };
+  }, [webContainer]);
 
   return (
     <div className="h-full flex items-center justify-center text-gray-400">
       {!url && <div className="text-center">
-        <p className="mb-2">Loading...</p>
+        <p className="mb-2 text-white">Loading preview...</p>
       </div>}
       {url && <iframe width={"100%"} height={"100%"} src={url} />}
     </div>

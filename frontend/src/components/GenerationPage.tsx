@@ -6,8 +6,9 @@ import { ArrowLeft, Download, Eye, Heading1, Share2 } from 'lucide-react';
 import { BACKEND_URL } from '../config';
 import axios from 'axios'
 import {parseXml}  from '../steps';
-import { useWebContainer } from '../hooks/useWebContainer';
+import { prebootWebContainer, useWebContainer } from '../hooks/useWebContainer';
 import {PreviewFrame}  from './PreviewFrame';
+import { motion } from 'framer-motion';
 
 
 export interface FileItem {
@@ -25,77 +26,19 @@ const GenerationPage: React.FC = () => {
   const navigate = useNavigate();
   const prompt = location.state?.prompt || 'Create a website';
   
+  // track active view: 'code' or 'preview'
+  const [activeView, setActiveView] = useState<'code' | 'preview'>('code');
   const [currentStep, setCurrentStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(true);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
   const [chatResponseStatus, setChatResponseStatus] = useState(false);
-  const webcontainer = useWebContainer();
- 
-
-  // const sampleFiles: FileItem[] = [
-  //   {
-  //     name: 'src',
-  //     type: 'folder',
-  //     children: [
-  //       {
-  //         name: 'components',
-  //         type: 'folder',
-  //         children: [
-  //           {
-  //             name: 'Header.tsx',
-  //             type: 'file',
-  //             content: MOCK_FILE_DATA
-  //           },
-  //           {
-  //             name: 'Hero.tsx',
-  //             type: 'file',
-  //             content: MOCK_FILE_DATA
-  //           }
-  //         ]
-  //       },
-  //       {
-  //         name: 'pages',
-  //         type: 'folder',
-  //         children: [
-  //           {
-  //             name: 'Home.tsx',
-  //             type: 'file',
-  //             content: MOCK_FILE_DATA
-  //           }
-  //         ]
-  //       },
-  //       {
-  //         name: 'App.tsx',
-  //         type: 'file',
-  //         content: MOCK_FILE_DATA
-  //       },
-  //       {
-  //         name: 'index.css',
-  //         type: 'file',
-  //         content: MOCK_FILE_DATA
-  //       }
-  //     ]
-  //   },
-  //   {
-  //     name: 'public',
-  //     type: 'folder',
-  //     children: [
-  //       {
-  //         name: 'index.html',
-  //         type: 'file',
-  //         content: MOCK_FILE_DATA
-  //       }
-  //     ]
-  //   },
-  //   {
-  //     name: 'package.json',
-  //     type: 'file',
-  //     content: MOCK_FILE_DATA
-  //   }
-  // ];
+  const { webcontainer, error: webcontainerError } = useWebContainer() as any;
 
   const [files, setFiles] = useState<FileItem[]>([ ])
+  const [mountStructure, setMountStructure] = useState<Record<string, any> | null>(null);
+  const [serverUrl, setServerUrl] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
 
   
@@ -167,53 +110,56 @@ const GenerationPage: React.FC = () => {
 
   useEffect(() => {
     const createMountStructure = (files: FileItem[]): Record<string, any> => {
-      const mountStructure: Record<string, any> = {};
-  
-      const processFile = (file: FileItem, isRootFolder: boolean) => {  
+      const processFile = (file: FileItem): any => {
         if (file.type === 'folder') {
-          // For folders, create a directory entry
-          mountStructure[file.name] = {
-            directory: file.children ? 
-              Object.fromEntries(
-                file.children.map(child => [child.name, processFile(child, false)])
-              ) 
-              : {}
+          return {
+            directory: Object.fromEntries((file.children || []).map(child => [child.name, processFile(child)]))
           };
-        } else if (file.type === 'file') {
-          if (isRootFolder) {
-            mountStructure[file.name] = {
-              file: {
-                contents: file.content || ''
-              }
-            };
-          } else {
-            // For files, create a file entry with contents
-            return {
-              file: {
-                contents: file.content || ''
-              }
-            };
-          }
         }
-  
-        return mountStructure[file.name];
+
+        // file
+        return {
+          file: {
+            contents: file.content || ''
+          }
+        };
       };
-  
-      // Process each top-level file/folder
-      files.forEach(file => processFile(file, true));
-  
-      return mountStructure;
+
+      return Object.fromEntries(files.map(f => [f.name, processFile(f)]));
     };
-  
+
     const mountStructure = createMountStructure(files);
-  
-    // Mount the structure if WebContainer is available
-    console.log(mountStructure);
-    webcontainer?.mount(mountStructure);
+
+    if (webcontainer && files.length) {
+      try {
+        webcontainer.mount(mountStructure);
+        console.log('mounted files to webcontainer', mountStructure);
+        setMountStructure(mountStructure);
+      } catch (err) {
+        console.error('mount failed', err);
+      }
+    }
   }, [files, webcontainer]);
+
+  useEffect(() => {
+    if (!webcontainer) return;
+    try {
+      const unsub = webcontainer.on('server-ready', (port: number, url: string) => {
+        console.log('server-ready (page):', port, url);
+        setServerUrl(url);
+      });
+
+      return () => {
+        try { unsub(); } catch (e) {}
+      };
+    } catch (e) {
+      // ignore
+    }
+  }, [webcontainer]);
 
 
   async function init() {
+    
     const response = await axios.post(`${BACKEND_URL}/template`, {
       prompt: prompt.trim()
     })   
@@ -231,13 +177,12 @@ const GenerationPage: React.FC = () => {
       }))
     })
 
-    
-
-    if(stepResponse.data.status == 200) {
-      setChatResponseStatus(true)
+    if (stepResponse.status === 200 && stepResponse.data && stepResponse.data.answer) {
+      setChatResponseStatus(true);
     }
 
-    setSteps(s => [...s, ...parseXml(stepResponse.data.response).map(x => ({
+    const chatAnswer = stepResponse.data?.answer ?? '';
+    setSteps(s => [...s, ...parseXml(chatAnswer).map(x => ({
       ...x,
       status: "pending" as "pending"
     }))]);
@@ -248,7 +193,8 @@ const GenerationPage: React.FC = () => {
     init();
   }, [])
 
-  
+
+  // view toggles handled inline via `setActiveView`
 
   return (
     <div className="min-h-screen bg-gradient-to-br max-h-screen h-full overflow-hidden from-gray-900 to-gray-800">
@@ -271,13 +217,13 @@ const GenerationPage: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-3">
-              <button  className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors duration-200 border border-gray-600">
+              <button onClick={() => setActiveView('preview')} className={`flex items-center gap-2 px-4 py-2 ${activeView === 'preview' ? 'bg-gray-700' : 'bg-gray-800'} hover:bg-gray-700 text-white rounded-lg transition-colors duration-200 border border-gray-600`}>
                 <Eye className="w-4 h-4" />
                 Preview
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 shadow-lg">
+              <button onClick={() => setActiveView('code')} className={`flex items-center gap-2 px-4 py-2 ${activeView === 'code' ? 'bg-gray-700' : 'bg-blue-600'} hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 shadow-lg`}>
                 <Download className="w-4 h-4" />
-                Download
+                Code View
               </button>
               <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 shadow-lg">
                 <Share2 className="w-4 h-4" />
@@ -308,74 +254,72 @@ const GenerationPage: React.FC = () => {
             />
           </div>
 
-          {/* Code Preview */}
-          {/* <div className="flex-1 overflow-hidden">
-            <AnimatePresence mode="wait">
-              {isGenerating ? (
-                <motion.div
-                  key="generating"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="h-full flex items-center justify-center bg-gray-900"
-                >
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center mb-4 mx-auto animate-pulse shadow-lg">
-                      <div className="w-8 h-8 bg-white rounded-full animate-spin"></div>
+          {/* Main Content Area - shows either Code View or Preview */}
+          <div className="flex-1 overflow-hidden">
+            {isGenerating ? (
+              <motion.div
+                key="generating"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="h-full flex items-center justify-center bg-gray-900"
+              >
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center mb-4 mx-auto animate-pulse shadow-lg">
+                    <div className="w-8 h-8 bg-white rounded-full animate-spin"></div>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Generating your website...</h3>
+                  <p className="text-gray-400">{steps[currentStep]?.description}</p>
+                </div>
+              </motion.div>
+            ) : (
+              activeView === 'code' ? (
+                selectedFile ? (
+                  <motion.div key="file-content" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="h-full bg-gray-950 text-gray-100 overflow-auto">
+                    <div className="p-4 border-b border-gray-800 bg-gray-900">
+                      <h3 className="font-semibold text-white">{selectedFile.name}</h3>
                     </div>
-                    <h3 className="text-lg font-semibold text-white mb-2">
-                      Generating your website...
-                    </h3>
-                    <p className="text-gray-400">
-                      {steps[currentStep]?.description}
-                    </p>
-                  </div>
-                </motion.div>
-              ) : 
-              selectedFile ? (
-                <motion.div
-                  key="file-content"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="h-full bg-gray-950 text-gray-100 overflow-auto"
-                >
-                  <div className="p-4 border-b border-gray-800 bg-gray-900">
-                    <h3 className="font-semibold text-white">{selectedFile.name}</h3>
-                  </div>
-                  <pre className="p-6 text-sm leading-relaxed overflow-auto h-full">
-                    <code>{selectedFile.content || '// File content will be generated...'}</code>
-                  </pre>
-                </motion.div>
+                    <pre className="p-6 text-sm leading-relaxed overflow-auto h-full"><code>{selectedFile.content || '// File content will be generated...'}</code></pre>
+                  </motion.div>
+                ) : (
+                  <motion.div key="no-selection" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex items-center justify-center bg-gray-900">
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4 mx-auto"><span className="text-2xl">📄</span></div>
+                      <h3 className="text-lg font-semibold text-white mb-2">Select a file to view</h3>
+                      <p className="text-gray-400">Choose a file from the explorer to see its content</p>
+                    </div>
+                  </motion.div>
+                )
               ) : (
-                <motion.div
-                  key="no-selection"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="h-full flex items-center justify-center bg-gray-900"
-                >
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4 mx-auto">
-                      <span className="text-2xl">📄</span>
-                    </div>
-                    <h3 className="text-lg font-semibold text-white mb-2">
-                      Select a file to view
-                    </h3>
-                    <p className="text-gray-400">
-                      Choose a file from the explorer to see its content
-                    </p>
+                <div className="h-full bg-gray-900 p-4 flex flex-col">
+                  <div className="flex-1">
+                    {!webcontainer && (
+                      <div className="text-center text-gray-400">
+                        <div>Web Container is not available</div>
+                        {webcontainerError && (
+                          <div className="text-xs text-red-400 mt-2">{webcontainerError}</div>
+                        )}
+                      </div>
+                    )}
+                    {webcontainer && <PreviewFrame webContainer={webcontainer} files={files} />}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div> */}
-
-            <div className="col-span-2 bg-gray-900 rounded-lg shadow-lg p-4 w-full h-full">
-            
-            {!webcontainer && <div className="text-center text-gray-400">Web Container is not available</div>}
-
-            {webcontainer && <PreviewFrame  webContainer={webcontainer} files={files} />}
-
-            </div>
+                  <div className="mt-2 text-sm text-gray-300">
+                    <button onClick={() => setShowDebug(s => !s)} className="px-3 py-1 bg-gray-800 rounded-md border border-gray-700">
+                      {showDebug ? 'Hide' : 'Show'} debug
+                    </button>
+                    {showDebug && (
+                      <div className="mt-2 bg-gray-800 p-3 rounded-md max-h-40 overflow-auto border border-gray-700 text-xs">
+                        <div className="text-xs text-gray-400 mb-1">Server URL:</div>
+                        <div className="text-green-300 break-words mb-2">{serverUrl || 'not ready'}</div>
+                        <div className="text-xs text-gray-400 mb-1">Mount Structure:</div>
+                        <pre className="text-xs text-gray-200 whitespace-pre-wrap">{mountStructure ? JSON.stringify(mountStructure, null, 2) : 'no mount yet'}</pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            )}
+          </div>
 
 
         </div>

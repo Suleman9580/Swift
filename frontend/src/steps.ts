@@ -2,7 +2,7 @@ import {Step, StepType} from './components/StepsSidebar'
 
 export function parseXml(response: string): Step[] {
     // Extract the XML content between <boltArtifact> tags
-    const xmlMatch = response.match(/<boltArtifact[^>]*>([\s\S]*?)<\/boltArtifact>/);
+    const xmlMatch = response?.match(/<boltArtifact[^>]*>([\s\S]*?)<\/boltArtifact>/);
     
     if (!xmlMatch) {
       return [];

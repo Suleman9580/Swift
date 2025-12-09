@@ -12,9 +12,9 @@ app.use(express.json())
 app.use(cors())
 const port = process.env.PORT || 3000 
 
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPEN_ROUTER_KEY,
+const client = new OpenAI({
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: "https://api.groq.com/openai/v1",
 });
 
 
@@ -22,9 +22,8 @@ const openai = new OpenAI({
 app.post('/template', async (req, res) => {
   const prompt = req.body.prompt
 
-  const response = await openai.chat.completions.create({
-    model: "openai/gpt-oss-20b:free",
-    max_tokens: 200,
+  const response = await client.chat.completions.create({
+    model: "openai/gpt-oss-20b",
     messages: [
       {
         role: "user",
@@ -37,9 +36,10 @@ app.post('/template', async (req, res) => {
     ]
   });
   
-  const answer = response.choices[0].message.content
+  const answer = response?.choices[0]?.message?.content?.trim()
+  console.log(answer)
 
-   if (answer == "react") {
+   if (answer === "react") {
         res.json({
             prompts: [BASE_PROMPT, `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
             uiPrompts: [reactBasePrompt]
@@ -49,11 +49,12 @@ app.post('/template', async (req, res) => {
 
     if (answer === "node") {
         res.json({
-            prompts: [`Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
+            prompts: [`Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${nodeBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
             uiPrompts: [nodeBasePrompt]
         })
         return;
     }
+
 
     res.status(403).json({message: "You cant access this"})
     return;
@@ -65,8 +66,8 @@ app.post('/chat', async (req, res) => {
 
   // console.log(messages)
 
-  const response = await openai.chat.completions.create({
-    model: "openai/gpt-oss-20b:free",
+  const response = await client.chat.completions.create({
+    model: "openai/gpt-oss-20b",
     messages: [
       ...messages,
       {
@@ -76,12 +77,9 @@ app.post('/chat', async (req, res) => {
     ]
   });
 
-  // // console.log(messages)
-
-  // console.log(response.choices[0].message.content)
-  
+  const answer = response?.choices[0]?.message?.content?.trim()
   res.json({
-    response: response.choices[0].message.content
+    answer
   })
   return
 })
@@ -93,44 +91,4 @@ app.post('/chat', async (req, res) => {
 app.listen(port, () => {
   console.log(`server is running on Port ${port}`);
 });
-
-
-// async function main() {
-//   const stream = await openai.chat.completions.create({
-//     model: "openai/gpt-oss-20b:free",
-//     messages: [
-//       {
-//         role: "system",
-//         content: getSystemPrompt()
-//       },
-//       {
-//         role: "user",
-//         content: ""
-//       },
-//       {
-//         role: "user",
-//         content: "build a todo application"
-//       }
-//     ],
-//     stream: true
-//   });
-
-//   // console.log(msg.choices[0].message.content);
-
-//   for await (const chunk of stream) {
-//     const content = chunk.choices[0]?.delta?.content;
-//     if (content) {
-//       process.stdout.write(content); // print without adding a new line each time
-//     }
-//   }
-
-// }
-
-// main();
-
-
-
-
-
-
 

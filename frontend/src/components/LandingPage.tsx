@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, Zap } from 'lucide-react';
+import { prebootWebContainer } from '../hooks/useWebContainer';
 
 const LandingPage: React.FC = () => {
   const [prompt, setPrompt] = useState('');
@@ -12,6 +13,8 @@ const LandingPage: React.FC = () => {
     e.preventDefault();
 
     if(prompt.trim()){
+      // begin booting the WebContainer while we navigate so preview is ready quicker
+      try { prebootWebContainer().catch(() => {}); } catch (e) {}
       navigate('/generate', {state: {prompt}})
     }
 
@@ -20,25 +23,24 @@ const LandingPage: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden">
+    <div className=" bg-gradient-to-br max-h-screen from-gray-900 via-gray-800 to-black relative overflow-hidden py-20 w-full">
 
-      <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
-        <div className="max-w-4xl mx-auto text-center">
+      
+        <div className="mx-auto text-center max-w-2xl flex flex-col gap-40">
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            
-            
-            <h1 className="text-6xl md:text-7xl font-bold text-white mb-12 ">
+            <h1 className="text-6xl md:text-7xl font-bold text-white  ">
               Build Websites with
               <span className="block bg-gradient-to-r from-purple-400 to-blue-400 leading-[1.30] bg-clip-text text-transparent drop-shadow-lg">
                 AI Magic
               </span>
             </h1>
 
-            <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Transform your ideas into stunning websites in minutes. Just describe what you want,
               and watch as we generate the perfect website for you.
             </p>
@@ -49,15 +51,18 @@ const LandingPage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
             onSubmit={handleSubmit}
-            className="mb-12"
+            
           >
-            <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-8 border border-gray-700/50 shadow-2xl">
-              <div className="flex items-center mb-4">
-                <Sparkles className="w-5 h-5 text-purple-300 mr-2" />
+            
+
+             <div className='flex items-center gap-2 mb-2'>
+
+                <Sparkles className="w-5 h-5 text-purple-300 " />
                 <span className="text-purple-300 font-medium">Describe your website</span>
-              </div>
+             </div>
+             
               
-              <div className="relative">
+              <div className="relative ">
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
@@ -84,21 +89,16 @@ const LandingPage: React.FC = () => {
                   )}
                 </button>
               </div>
-            </div>
+            
           </motion.form>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="grid md:grid-cols-2 gap-4"
-          >
+          
             
             
             
-          </motion.div>
+         
         </div>
-      </div>
+      
 
       
     </div>
