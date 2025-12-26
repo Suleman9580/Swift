@@ -1,5 +1,5 @@
-// export const BACKEND_URL="https://swift-inxn.onrender.com"
-export const BACKEND_URL="http://localhost:3000"
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || ''
+// To override locally, create a `.env` in the `frontend/` folder with `VITE_BACKEND_URL` set
 
 
 export const MOCK_FILE_DATA = `import React from 'react';
